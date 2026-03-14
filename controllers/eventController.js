@@ -2,7 +2,8 @@ const Event = require('../models/Event');
 
 const getAllEvents = async (req, res) => {
   try {
-    const events = await Event.find({ status: { $ne: 'cancelled' } }).sort({ date: 1 });
+    // Removed status filter — show all events regardless of status field
+    const events = await Event.find().sort({ date: 1 });
     res.json({ success: true, events, count: events.length });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -36,7 +37,8 @@ const createEvent = async (req, res) => {
     if (!venue)       return res.status(400).json({ success: false, message: 'Venue is required' });
     if (!category)    return res.status(400).json({ success: false, message: 'Category is required' });
     if (!totalSeats)  return res.status(400).json({ success: false, message: 'Total seats is required' });
-    if (price === undefined || price === null || price === '') return res.status(400).json({ success: false, message: 'Price is required' });
+    if (price === undefined || price === null || price === '')
+      return res.status(400).json({ success: false, message: 'Price is required' });
 
     const total     = parseInt(totalSeats);
     const available = (availableSeats !== undefined && availableSeats !== '') ? parseInt(availableSeats) : total;
@@ -114,7 +116,7 @@ const deleteEvent = async (req, res) => {
 const getEventsByCategory = async (req, res) => {
   try {
     const { category } = req.params;
-    const events = await Event.find({ category, status: { $ne: 'cancelled' } }).sort({ date: 1 });
+    const events = await Event.find({ category }).sort({ date: 1 });
     res.json({ success: true, events, count: events.length });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

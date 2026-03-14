@@ -3,25 +3,27 @@ const Event = require('../models/Event');
 
 const createBooking = async (req, res) => {
   try {
-    const { eventId, numberOfTickets } = req.body;
+    // Accept both 'quantity' (frontend) and 'numberOfTickets' (legacy)
+    const { eventId, quantity, numberOfTickets } = req.body;
+    const tickets = quantity || numberOfTickets;
     const userId = req.user.id;
 
-    if (!eventId || !numberOfTickets)
-      return res.status(400).json({ success: false, message: 'eventId and numberOfTickets are required' });
+    if (!eventId || !tickets)
+      return res.status(400).json({ success: false, message: 'eventId and quantity are required' });
 
     const event = await Event.findById(eventId);
     if (!event)
       return res.status(404).json({ success: false, message: 'Event not found' });
 
-    if (event.availableSeats < numberOfTickets)
+    if (event.availableSeats < tickets)
       return res.status(400).json({ success: false, message: 'Not enough seats available' });
 
-    const totalAmount = event.price * numberOfTickets;
+    const totalAmount = event.price * tickets;
 
     const booking = new Booking({
       user: userId,
       event: eventId,
-      numberOfTickets,
+      numberOfTickets: tickets,
       totalAmount,
       status: 'confirmed',
       paymentStatus: 'unpaid'
@@ -29,7 +31,7 @@ const createBooking = async (req, res) => {
     await booking.save();
 
     await Event.findByIdAndUpdate(eventId, {
-      $inc: { availableSeats: -numberOfTickets }
+      $inc: { availableSeats: -tickets }
     });
 
     const populated = await Booking.findById(booking._id)

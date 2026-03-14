@@ -2,6 +2,8 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
+const JWT_SECRET = process.env.JWT_SECRET || 'eventhub_secret_key';
+
 // ── SIGNUP ─────────────────────────────────────────
 const signup = async (req, res) => {
   try {
@@ -13,16 +15,13 @@ const signup = async (req, res) => {
     if (password.length < 6)
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
 
-    // Check if user already exists
     const existing = await User.findOne({ email: email.toLowerCase() });
     if (existing)
       return res.status(400).json({ success: false, message: 'Email already registered. Please login.' });
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create user
     const user = new User({
       name: name.trim(),
       email: email.toLowerCase().trim(),
@@ -32,10 +31,9 @@ const signup = async (req, res) => {
 
     await user.save();
 
-    // Generate token
     const token = jwt.sign(
       { id: user._id, role: user.role },
-      process.env.JWT_SECRET || 'eventhub_secret_key',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -48,9 +46,9 @@ const signup = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        profilePhoto: user.profilePhoto,
       },
     });
-
   } catch (error) {
     console.error('Signup error:', error.message);
     res.status(500).json({ success: false, message: error.message });
@@ -65,20 +63,17 @@ const login = async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ success: false, message: 'Email and password are required' });
 
-    // Find user
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user)
       return res.status(400).json({ success: false, message: 'No account found with this email' });
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(400).json({ success: false, message: 'Incorrect password' });
 
-    // Generate token
     const token = jwt.sign(
       { id: user._id, role: user.role },
-      process.env.JWT_SECRET || 'eventhub_secret_key',
+      JWT_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -91,9 +86,9 @@ const login = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        profilePhoto: user.profilePhoto,
       },
     });
-
   } catch (error) {
     console.error('Login error:', error.message);
     res.status(500).json({ success: false, message: error.message });
@@ -108,6 +103,35 @@ const getProfile = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
 
     res.json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ── UPDATE PROFILE ─────────────────────────────────
+const updateProfile = async (req, res) => {
+  try {
+    const { name, profilePhoto } = req.body;
+    const user = await User.findById(req.user.id);
+    if (!user)
+      return res.status(404).json({ success: false, message: 'User not found' });
+
+    if (name) user.name = name.trim();
+    if (profilePhoto !== undefined) user.profilePhoto = profilePhoto;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile updated!',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        profilePhoto: user.profilePhoto,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -131,4 +155,4 @@ const makeAdmin = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, getProfile, makeAdmin };
+module.exports = { signup, login, getProfile, updateProfile, makeAdmin };
